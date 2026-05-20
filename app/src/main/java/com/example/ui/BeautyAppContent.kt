@@ -41,6 +41,8 @@ import com.example.data.CartItem
 import com.example.data.Order
 import com.example.data.Product
 import com.example.data.ChatMessage
+import com.example.data.UserProfile
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -81,6 +83,7 @@ fun BeautyAppContent(viewModel: BeautyViewModel) {
                     Screen.CART -> CartScreen(viewModel = viewModel)
                     Screen.CHECKOUT -> CheckoutScreen(viewModel = viewModel)
                     Screen.TRACK_ORDER -> OrderTrackScreen(viewModel = viewModel)
+                    Screen.ACCOUNT -> AccountScreen(viewModel = viewModel)
                     else -> {}
                 }
             }
@@ -100,6 +103,7 @@ fun BeautyHeader(viewModel: BeautyViewModel, cartCount: Int) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -213,6 +217,24 @@ fun BeautyBottomNavBar(viewModel: BeautyViewModel, currentScreen: Screen) {
                 Icon(
                     imageVector = if (currentScreen == Screen.TRACK_ORDER) Icons.Filled.LocalShipping else Icons.Outlined.LocalShipping,
                     contentDescription = "Track Order"
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = LipstickPrimary,
+                selectedTextColor = LipstickPrimary,
+                indicatorColor = LipstickLight
+            )
+        )
+
+        NavigationBarItem(
+            selected = currentScreen == Screen.ACCOUNT,
+            onClick = { viewModel.navigateTo(Screen.ACCOUNT) },
+            label = { Text("অ্যাকাউন্ট", fontWeight = FontWeight.Bold) },
+            modifier = Modifier.testTag("account_button"),
+            icon = {
+                Icon(
+                    imageVector = if (currentScreen == Screen.ACCOUNT) Icons.Filled.AccountCircle else Icons.Outlined.AccountCircle,
+                    contentDescription = "Account"
                 )
             },
             colors = NavigationBarItemDefaults.colors(
@@ -1245,6 +1267,15 @@ fun CheckoutScreen(viewModel: BeautyViewModel) {
     val totalAmount by viewModel.totalAmount.collectAsState()
     val cartList by viewModel.cart.collectAsState()
 
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val loggedInUser by viewModel.loggedInUser.collectAsState()
+    val isAuthLoading by viewModel.isAuthLoading.collectAsState()
+
+    var showInlineLogin by remember { mutableStateOf(false) }
+    var loginPhone by remember { mutableStateOf("") }
+    var loginPass by remember { mutableStateOf("") }
+    var isPassVisible by remember { mutableStateOf(false) }
+
     // Form states
     val nameS by viewModel.customerName.collectAsState()
     val phoneS by viewModel.phoneNumber.collectAsState()
@@ -1269,6 +1300,137 @@ fun CheckoutScreen(viewModel: BeautyViewModel) {
             color = LipstickPrimary,
             modifier = Modifier.padding(16.dp)
         )
+
+        // Web login system adaptation
+        if (isLoggedIn && loggedInUser != null) {
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = SuccessGreen.copy(alpha = 0.08f)),
+                border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.3f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Logged In",
+                        tint = SuccessGreen,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "লগইন আছেন: ${loggedInUser!!.name} (${loggedInUser!!.phone})",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SuccessGreen
+                    )
+                }
+            }
+        } else {
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = LipstickLight.copy(alpha = 0.6f)),
+                border = BorderStroke(1.dp, LipstickAccent),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "Lock icon",
+                                tint = LipstickPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "ইতিমধ্যে কোনো অ্যাকাউন্ট আছে?",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = BeautyOnSurface
+                            )
+                        }
+                        Text(
+                            text = if (showInlineLogin) "বন্ধ করুন" else "লগইন করুন",
+                            color = LipstickPrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clickable { showInlineLogin = !showInlineLogin }
+                                .padding(4.dp)
+                        )
+                    }
+
+                    if (showInlineLogin) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = loginPhone,
+                            onValueChange = { loginPhone = it },
+                            label = { Text("মোবাইল নম্বর", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.Phone, null, modifier = Modifier.size(16.dp)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = LipstickPrimary, focusedLabelColor = LipstickPrimary),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = loginPass,
+                            onValueChange = { loginPass = it },
+                            label = { Text("পাসওয়ার্ড", fontSize = 11.sp) },
+                            leadingIcon = { Icon(Icons.Default.Lock, null, modifier = Modifier.size(16.dp)) },
+                            trailingIcon = {
+                                IconButton(onClick = { isPassVisible = !isPassVisible }) {
+                                    Icon(
+                                        imageVector = if (isPassVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            },
+                            visualTransformation = if (isPassVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = LipstickPrimary, focusedLabelColor = LipstickPrimary),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                viewModel.loginUser(loginPhone, loginPass,
+                                    onSuccess = {
+                                        Toast.makeText(context, "লগইন সফল হয়েছে! শিপিং ডিটেইলস পূরণ হয়েছে।", Toast.LENGTH_SHORT).show()
+                                        showInlineLogin = false
+                                    },
+                                    onFailure = { err ->
+                                        Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                                    }
+                                )
+                            },
+                            enabled = !isAuthLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = LipstickPrimary),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isAuthLoading) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp))
+                            } else {
+                                Text("লগইন", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // Cart Preview horizontal scrolling
         Text(
@@ -2047,6 +2209,821 @@ fun InteractiveTimelineTracker(currentStatus: String) {
                     fontWeight = if (isCurrent) FontWeight.ExtraBold else FontWeight.Bold,
                     color = if (isCurrent) LipstickPrimary else if (isDone) SuccessGreen else Color.Gray
                 )
+            }
+        }
+    }
+}
+
+// ============================================
+// # SCREEN 6: ACCOUNT PROFILE & AUTHENTICATION SCREEN
+// ============================================
+
+@Composable
+fun AccountScreen(viewModel: BeautyViewModel) {
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val loggedInUser by viewModel.loggedInUser.collectAsState()
+    val isAuthLoading by viewModel.isAuthLoading.collectAsState()
+    val authError by viewModel.authError.collectAsState()
+    val userOrders by viewModel.userOrders.collectAsState()
+    val isUserOrdersLoading by viewModel.isUserOrdersLoading.collectAsState()
+    val activeTrackedOrder by viewModel.selectedTrackingOrder.collectAsState()
+
+    val context = LocalContext.current
+
+    // Trigger syncing user orders if logged in
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
+            viewModel.loadUserOrders()
+            viewModel.syncTrackingOrders()
+        }
+    }
+
+    if (activeTrackedOrder != null) {
+        OrderTrackerModalOverlay(order = activeTrackedOrder!!, onClose = { viewModel.closeOrderModal() })
+    } else {
+        if (isLoggedIn && loggedInUser != null) {
+            UserProfileDashboard(
+                user = loggedInUser!!,
+                userOrders = userOrders,
+                isLoadingOrders = isUserOrdersLoading,
+                isUpdating = isAuthLoading,
+                onUpdate = { name, email, addr ->
+                    viewModel.updateProfile(name, email, addr,
+                        onSuccess = {
+                            Toast.makeText(context, "প্রোফাইল তথ্য সফলভাবে আপডেট হয়েছে!", Toast.LENGTH_SHORT).show()
+                        },
+                        onFailure = { err ->
+                            Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                        }
+                    )
+                },
+                onLogout = {
+                    viewModel.logout()
+                    Toast.makeText(context, "লগআউট সম্পন্ন হয়েছে।", Toast.LENGTH_SHORT).show()
+                },
+                onSelectOrder = { order ->
+                    viewModel.selectTrackingOrder(order)
+                }
+            )
+        } else {
+            var isRegisterPage by remember { mutableStateOf(false) }
+
+            if (isRegisterPage) {
+                UserRegisterView(
+                    isLoading = isAuthLoading,
+                    onRegister = { name, phone, email, address, pass ->
+                        viewModel.registerUser(name, phone, email, address, pass,
+                            onSuccess = {
+                                Toast.makeText(context, "নিবন্ধন সফল হয়েছে! স্বাগতম।", Toast.LENGTH_SHORT).show()
+                            },
+                            onFailure = { err ->
+                                Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    },
+                    onNavigateLogin = { isRegisterPage = false }
+                )
+            } else {
+                UserLoginView(
+                    isLoading = isAuthLoading,
+                    onLogin = { phone, pass ->
+                        viewModel.loginUser(phone, pass,
+                            onSuccess = {
+                                Toast.makeText(context, "লগইন সফল হয়েছে! স্বাগতম।", Toast.LENGTH_SHORT).show()
+                            },
+                            onFailure = { err ->
+                                Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    },
+                    onNavigateRegister = { isRegisterPage = true }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun UserLoginView(
+    isLoading: Boolean,
+    onLogin: (String, String) -> Unit,
+    onNavigateRegister: () -> Unit
+) {
+    var phone by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .background(MaterialTheme.colorScheme.background)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Spacer(modifier = Modifier.height(20.dp))
+        
+        // Brand logo
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(LipstickPrimary),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = "Login Lock",
+                tint = Color.White,
+                modifier = Modifier.size(36.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "গ্রাহক লগইন",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = LipstickPrimary
+        )
+
+        Text(
+            text = "Any's Beauty Corner অ্যাকাউন্টে লগইন করুন",
+            fontSize = 12.sp,
+            color = BeautyGrayText,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+        )
+
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("মোবাইল নম্বর", fontSize = 12.sp) },
+                    placeholder = { Text("যেমন: 017XXXXXXXX", fontSize = 12.sp) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Phone, contentDescription = "Phone icon", tint = LipstickPrimary)
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = LipstickPrimary,
+                        focusedLabelColor = LipstickPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("পাসওয়ার্ড", fontSize = 12.sp) },
+                    placeholder = { Text("আপনার সিক্রেট পাসওয়ার্ড", fontSize = 12.sp) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Lock, contentDescription = "Password icon", tint = LipstickPrimary)
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                            Icon(
+                                imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = "Toggle password visibility",
+                                tint = Color.Gray
+                            )
+                        }
+                    },
+                    visualTransformation = if (isPasswordVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = LipstickPrimary,
+                        focusedLabelColor = LipstickPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Button(
+                    onClick = { onLogin(phone, password) },
+                    enabled = !isLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = LipstickPrimary),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("লগইন করুন", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("নতুন গ্রাহক? ", fontSize = 12.sp, color = BeautyGrayText)
+            Text(
+                text = "রেজিস্ট্রেশন করুন",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = LipstickPrimary,
+                modifier = Modifier
+                    .clickable { onNavigateRegister() }
+                    .padding(4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun UserRegisterView(
+    isLoading: Boolean,
+    onRegister: (String, String, String, String, String) -> Unit,
+    onNavigateLogin: () -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .background(MaterialTheme.colorScheme.background)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(LipstickPrimary),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.PersonAdd,
+                contentDescription = "Register Profile",
+                tint = Color.White,
+                modifier = Modifier.size(36.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "নতুন অ্যাকাউন্ট তৈরি করুন",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = LipstickPrimary
+        )
+
+        Text(
+            text = "আপনার সঠিক বিবরণ দিয়ে অ্যাকাউন্ট নিবন্ধন সম্পন্ন করুন",
+            fontSize = 12.sp,
+            color = BeautyGrayText,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+        )
+
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("আপনার নাম *", fontSize = 12.sp) },
+                    placeholder = { Text("যেমন: নাজিয়া রহমান", fontSize = 12.sp) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Person, contentDescription = "Name icon", tint = LipstickPrimary)
+                    },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = LipstickPrimary,
+                        focusedLabelColor = LipstickPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("মোবাইল নম্বর *", fontSize = 12.sp) },
+                    placeholder = { Text("যেমন: 01XXXXXXXXX", fontSize = 12.sp) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Phone, contentDescription = "Phone icon", tint = LipstickPrimary)
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = LipstickPrimary,
+                        focusedLabelColor = LipstickPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("ইমেইল ঠিকানা (ঐচ্ছিক)", fontSize = 12.sp) },
+                    placeholder = { Text("যেমন: mail@example.com", fontSize = 12.sp) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Email, contentDescription = "Email icon", tint = LipstickPrimary)
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = LipstickPrimary,
+                        focusedLabelColor = LipstickPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it },
+                    label = { Text("ডেলিভারি ঠিকানা (ঐচ্ছিক)", fontSize = 12.sp) },
+                    placeholder = { Text("বাসা ও এলাকা রোডসহ পূর্ণ ঠিকানা দিন", fontSize = 12.sp) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Home, contentDescription = "Address icon", tint = LipstickPrimary)
+                    },
+                    maxLines = 2,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = LipstickPrimary,
+                        focusedLabelColor = LipstickPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("পাসওয়ার্ড *", fontSize = 12.sp) },
+                    placeholder = { Text("কমপক্ষে ৬ ডিজিটের পাসওয়ার্ড", fontSize = 12.sp) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Lock, contentDescription = "Password icon", tint = LipstickPrimary)
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                            Icon(
+                                imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = "Toggle password visibility",
+                                tint = Color.Gray
+                            )
+                        }
+                    },
+                    visualTransformation = if (isPasswordVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = LipstickPrimary,
+                        focusedLabelColor = LipstickPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Button(
+                    onClick = { onRegister(name, phone, email, address, password) },
+                    enabled = !isLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = LipstickPrimary),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("নিবন্ধন করুন", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("ইতিমধ্যে অ্যাকাউন্ট আছে? ", fontSize = 12.sp, color = BeautyGrayText)
+            Text(
+                text = "লগইন করুন",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = LipstickPrimary,
+                modifier = Modifier
+                    .clickable { onNavigateLogin() }
+                    .padding(4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun UserProfileDashboard(
+    user: UserProfile,
+    userOrders: List<Order>,
+    isLoadingOrders: Boolean,
+    isUpdating: Boolean,
+    onUpdate: (String, String, String) -> Unit,
+    onLogout: () -> Unit,
+    onSelectOrder: (Order) -> Unit
+) {
+    var activeTab by remember { mutableStateOf(0) } // 0 = Profile, 1 = Orders
+    
+    var editName by remember { mutableStateOf(user.name) }
+    var editEmail by remember { mutableStateOf(user.email) }
+    var editAddress by remember { mutableStateOf(user.address) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Welcome and Logout header
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 4.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(CircleShape)
+                                .background(LipstickPrimary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = user.name.firstOrNull()?.uppercase()?.toString() ?: "A",
+                                color = Color.White,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                "আসসালামু আলাইকুম,",
+                                fontSize = 11.sp,
+                                color = BeautyGrayText
+                            )
+                            Text(
+                                user.name,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = BeautyOnSurface
+                            )
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = onLogout,
+                        border = BorderStroke(1.dp, LipstickPrimary),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = LipstickPrimary),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Icon(Icons.Default.Logout, contentDescription = "Logout", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("লগআউট", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Tab choices
+                TabRow(
+                    selectedTabIndex = activeTab,
+                    containerColor = Color.Transparent,
+                    contentColor = LipstickPrimary
+                ) {
+                    Tab(
+                        selected = activeTab == 0,
+                        onClick = { activeTab = 0 }
+                    ) {
+                        Text("প্রোফাইল তথ্য", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(vertical = 12.dp))
+                    }
+                    Tab(
+                        selected = activeTab == 1,
+                        onClick = { activeTab = 1 }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        ) {
+                            Text("আমার অর্ডারসমূহ", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            if (userOrders.isNotEmpty()) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clip(CircleShape)
+                                        .background(LipstickPrimary),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        userOrders.size.toString(),
+                                        color = Color.White,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Tab Content Router
+        if (activeTab == 0) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            "প্রোফাইল বিবরণী এডিট করুন",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = LipstickPrimary
+                        )
+
+                        OutlinedTextField(
+                            value = editName,
+                            onValueChange = { editName = it },
+                            label = { Text("আপনার নাম", fontSize = 11.sp) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = LipstickPrimary, focusedLabelColor = LipstickPrimary),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value = user.phone,
+                            onValueChange = {},
+                            label = { Text("নিবন্ধিত মোবাইল নম্বর (পরিবর্তনযোগ্য নয়)", fontSize = 11.sp) },
+                            singleLine = true,
+                            enabled = false,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledBorderColor = BeautyGrayBorder,
+                                disabledLabelColor = BeautyGrayText
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value = editEmail,
+                            onValueChange = { editEmail = it },
+                            label = { Text("ইমেইল ঠিকানা", fontSize = 11.sp) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = LipstickPrimary, focusedLabelColor = LipstickPrimary),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value = editAddress,
+                            onValueChange = { editAddress = it },
+                            label = { Text("ফুল ডেলিভারি ঠিকানা", fontSize = 11.sp) },
+                            maxLines = 3,
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = LipstickPrimary, focusedLabelColor = LipstickPrimary),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Button(
+                            onClick = { onUpdate(editName, editEmail, editAddress) },
+                            enabled = !isUpdating,
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = LipstickPrimary),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                        ) {
+                            if (isUpdating) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                            } else {
+                                Text("তথ্যাদি আপডেট করুন", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Orders Tab overview list
+            if (isLoadingOrders) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = LipstickPrimary)
+                }
+            } else if (userOrders.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ShoppingBag,
+                            contentDescription = "No order history",
+                            tint = Color.LightGray,
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "আপনি এখনও কোনো অর্ডার করেননি",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = BeautyOnSurface.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "আপনার Any's Beauty Corner এর প্রিয় পণ্যগুলো হোম পেজ থেকে বেছে নিয়ে সহজে অর্ডার করুন!",
+                            fontSize = 11.sp,
+                            color = BeautyGrayText,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(userOrders) { order ->
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectOrder(order) }
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "অর্ডার আইডি: #${order.orderId}",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = LipstickPrimary
+                                        )
+                                        Text(
+                                            text = "তারিখ: ${order.orderDate.split("T").first()}",
+                                            fontSize = 10.sp,
+                                            color = BeautyGrayText
+                                        )
+                                    }
+
+                                    val statusBengali = when (order.status) {
+                                        "processing" -> "প্রক্রিয়াকরণ"
+                                        "confirmed" -> "কনফার্মড"
+                                        "packaging" -> "প্যাকেজিং"
+                                        "shipped" -> "পাঠানো হয়েছে"
+                                        "delivered" -> "ডেলিভারড"
+                                        else -> "প্রসেসিং"
+                                    }
+
+                                    val badgeColor = when (order.status) {
+                                        "delivered" -> SuccessGreen
+                                        "shipped" -> InfoBlue
+                                        "packaging" -> PendingYellow
+                                        "confirmed" -> LipstickAccent
+                                        else -> StatusOrange
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .background(badgeColor.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                                            .border(1.dp, badgeColor, RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = statusBengali,
+                                            color = badgeColor,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                HorizontalDivider(color = BeautyGrayBorder, modifier = Modifier.padding(vertical = 10.dp))
+
+                                // Items mini overview row
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = order.cartItems.joinToString(", ") { it.product.name },
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "${order.cartItems.sumOf { it.quantity }} টি আইটেম",
+                                            fontSize = 10.sp,
+                                            color = BeautyGrayText
+                                        )
+                                    }
+                                    
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "৳ ${order.totalAmount.toInt()}",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = BeautyOnSurface
+                                        )
+                                        Text(
+                                            text = "ক্লিক করে ট্র্যাক করুন",
+                                            fontSize = 8.sp,
+                                            color = LipstickPrimary,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

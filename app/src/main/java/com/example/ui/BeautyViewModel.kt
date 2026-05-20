@@ -14,6 +14,7 @@ enum class Screen {
     CART,
     CHECKOUT,
     TRACK_ORDER,
+    ACCOUNT,
     CHAT_AI
 }
 
@@ -79,6 +80,25 @@ class BeautyViewModel(application: Application) : AndroidViewModel(application) 
     private val _isAiLoading = MutableStateFlow(false)
     val isAiLoading: StateFlow<Boolean> = _isAiLoading.asStateFlow()
 
+    // --- User Authentication and Account States ---
+    private val _isLoggedIn = MutableStateFlow(false)
+    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
+
+    private val _loggedInUser = MutableStateFlow<UserProfile?>(null)
+    val loggedInUser: StateFlow<UserProfile?> = _loggedInUser.asStateFlow()
+
+    private val _isAuthLoading = MutableStateFlow(false)
+    val isAuthLoading: StateFlow<Boolean> = _isAuthLoading.asStateFlow()
+
+    private val _authError = MutableStateFlow("")
+    val authError: StateFlow<String> = _authError.asStateFlow()
+
+    private val _userOrders = MutableStateFlow<List<Order>>(emptyList())
+    val userOrders: StateFlow<List<Order>> = _userOrders.asStateFlow()
+
+    private val _isUserOrdersLoading = MutableStateFlow(false)
+    val isUserOrdersLoading: StateFlow<Boolean> = _isUserOrdersLoading.asStateFlow()
+
     // --- Computed State Flows ---
     val filteredProducts: StateFlow<List<Product>> = combine(
         _products, _activeCategory, _searchQuery
@@ -127,6 +147,25 @@ class BeautyViewModel(application: Application) : AndroidViewModel(application) 
     init {
         loadCatalog()
         loadLocalOrderTrackers()
+        loadUserSession()
+    }
+
+    private fun loadUserSession() {
+        val savedPhone = sharedPrefs.getString("user_phone", "") ?: ""
+        val savedName = sharedPrefs.getString("user_name", "") ?: ""
+        val savedEmail = sharedPrefs.getString("user_email", "") ?: ""
+        val savedAddress = sharedPrefs.getString("user_address", "") ?: ""
+        
+        if (savedPhone.isNotBlank()) {
+            _isLoggedIn.value = true
+            _loggedInUser.value = UserProfile(
+                phone = savedPhone,
+                name = savedName,
+                email = savedEmail,
+                address = savedAddress
+            )
+            autofillCheckoutFromProfile()
+        }
     }
 
     // --- Action Methods ---
@@ -245,6 +284,7 @@ class BeautyViewModel(application: Application) : AndroidViewModel(application) 
 
             _isOrdering.value = true
             try {
+                val user = _loggedInUser.value
                 val order = Order(
                     customerName = customerName.value,
                     phoneNumber = phoneNumber.value,
@@ -254,8 +294,8 @@ class BeautyViewModel(application: Application) : AndroidViewModel(application) 
                     subTotal = subtotal.value,
                     totalAmount = totalAmount.value,
                     cartItems = _cart.value,
-                    userId = "GUEST_" + System.currentTimeMillis(),
-                    customerEmail = "guest@checkout.com",
+                    userId = user?.phone?.let { "USER_$it" } ?: ("GUEST_" + System.currentTimeMillis()),
+                    customerEmail = user?.email?.ifBlank { "guest@checkout.com" } ?: "guest@checkout.com",
                     deliveryNote = deliveryNote.value.ifBlank { "N/A" },
                     outsideDhakaLocation = if (deliveryLocation.value == "outsideDhaka") outsideDhakaLocation.value else "N/A",
                     paymentNumber = if (deliveryLocation.value == "outsideDhaka") paymentNumber.value else "N/A",
@@ -275,6 +315,9 @@ class BeautyViewModel(application: Application) : AndroidViewModel(application) 
                 transactionId.value = ""
                 deliveryNote.value = ""
 
+                // Autofill again if they are logged in!
+                autofillCheckoutFromProfile()
+
                 // Fetch tracking orders updated list
                 syncTrackingOrders()
 
@@ -293,7 +336,10 @@ class BeautyViewModel(application: Application) : AndroidViewModel(application) 
     fun syncTrackingOrders() {
         viewModelScope.launch {
             _isTrackingLoading.value = true
-            val list = repository.fetchOrdersForUser("", "", _guestOrderIds.value)
+            val user = _loggedInUser.value
+            val userEmail = user?.email ?: ""
+            val userPhone = user?.phone ?: ""
+            val list = repository.fetchOrdersForUser("", userEmail, userPhone, _guestOrderIds.value)
             _trackedOrders.value = list
             _isTrackingLoading.value = false
         }
@@ -354,5 +400,195 @@ class BeautyViewModel(application: Application) : AndroidViewModel(application) 
         _chatMessages.value = listOf(
             ChatMessage("model", "এআই চ্যাট হিস্ট্রি মুছে ফেলা হয়েছে। নতুন কী জানতে চান বলুন!")
         )
+    }
+
+    // --- User Authentication / Account Methods ---
+
+    fun registerUser(
+        name: String,
+        phone: String,
+        email: String,
+        address: String,
+        pass: String,
+        onSuccess: () -> Unit,
+        onFailure: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isAuthLoading.value = true
+            _authError.value = ""
+            try {
+                val cleanedName = name.trim()
+                val cleanedPhone = phone.trim().replace(" ", "").replace("-", "")
+                val cleanedEmail = email.trim()
+                val cleanedAddress = address.trim()
+                val cleanedPass = pass.trim()
+
+                if (cleanedName.isBlank() || cleanedPhone.isBlank() || cleanedPass.isBlank()) {
+                    _isAuthLoading.value = false
+                    onFailure("অনুগ্রহ করে নাম, মোবাইল নম্বর এবং পাসওয়ার্ড দিন।")
+                    return@launch
+                }
+
+                if (cleanedPhone.length < 11) {
+                    _isAuthLoading.value = false
+                    onFailure("সঠিক ১১ ডিজিটের মোবাইল নম্বরটি দিন।")
+                    return@launch
+                }
+
+                // Check if user already exists
+                val existing = repository.getUserProfile(cleanedPhone)
+                if (existing != null) {
+                    _isAuthLoading.value = false
+                    onFailure("এই মোবাইল নম্বর দিয়ে ইতিমধ্যে একটি অ্যাকাউন্ট তৈরি করা হয়েছে! অনুগ্রহ করে লগইন করুন।")
+                    return@launch
+                }
+
+                val profile = UserProfile(
+                    phone = cleanedPhone,
+                    name = cleanedName,
+                    email = cleanedEmail,
+                    address = cleanedAddress,
+                    passwordHash = cleanedPass
+                )
+
+                val saved = repository.saveUserProfile(cleanedPhone, profile)
+                if (saved) {
+                    saveSessionLocally(profile)
+                    _isAuthLoading.value = false
+                    onSuccess()
+                } else {
+                    _isAuthLoading.value = false
+                    onFailure("সার্ভার ত্রুটি, অনুগ্রহ করে আবার চেষ্টা করুন।")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _isAuthLoading.value = false
+                onFailure("সংযোগ ত্রুটি: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun loginUser(phone: String, pass: String, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
+        viewModelScope.launch {
+            _isAuthLoading.value = true
+            _authError.value = ""
+            try {
+                val cleanedPhone = phone.trim().replace(" ", "").replace("-", "")
+                val cleanedPass = pass.trim()
+
+                if (cleanedPhone.isBlank() || cleanedPass.isBlank()) {
+                    _isAuthLoading.value = false
+                    onFailure("মোবাইল নম্বর এবং পাসওয়ার্ড প্রদান করুন।")
+                    return@launch
+                }
+
+                val profile = repository.getUserProfile(cleanedPhone)
+                if (profile == null) {
+                    _isAuthLoading.value = false
+                    onFailure("এই মোবাইল নম্বর সম্বলিত কোনো অ্যাকাউন্ট পাওয়া যায়নি।")
+                    return@launch
+                }
+
+                if (profile.passwordHash != cleanedPass) {
+                    _isAuthLoading.value = false
+                    onFailure("ভুল পাসওয়ার্ড! অনুগ্রহ করে সঠিক পাসওয়ার্ড দিন।")
+                    return@launch
+                }
+
+                saveSessionLocally(profile)
+                _isAuthLoading.value = false
+                onSuccess()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _isAuthLoading.value = false
+                onFailure("সংযোগ ত্রুটি: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun updateProfile(name: String, email: String, address: String, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
+        viewModelScope.launch {
+            _isAuthLoading.value = true
+            val currentProfile = _loggedInUser.value
+            if (currentProfile == null) {
+                _isAuthLoading.value = false
+                onFailure("আপনি লগইন অবস্থায় নেই।")
+                return@launch
+            }
+
+            try {
+                val updated = currentProfile.copy(
+                    name = name.trim(),
+                    email = email.trim(),
+                    address = address.trim()
+                )
+
+                val saved = repository.saveUserProfile(updated.phone, updated)
+                if (saved) {
+                    saveSessionLocally(updated)
+                    _isAuthLoading.value = false
+                    onSuccess()
+                } else {
+                    _isAuthLoading.value = false
+                    onFailure("প্রোফাইল আপডেট করা যায়নি। সার্ভার ত্রুটি।")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _isAuthLoading.value = false
+                onFailure("সংযোগ ত্রুটি: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun logout() {
+        sharedPrefs.edit()
+            .remove("user_phone")
+            .remove("user_name")
+            .remove("user_email")
+            .remove("user_address")
+            .apply()
+
+        _isLoggedIn.value = false
+        _loggedInUser.value = null
+        _userOrders.value = emptyList()
+
+        customerName.value = ""
+        phoneNumber.value = ""
+        address.value = ""
+    }
+
+    private fun saveSessionLocally(profile: UserProfile) {
+        sharedPrefs.edit()
+            .putString("user_phone", profile.phone)
+            .putString("user_name", profile.name)
+            .putString("user_email", profile.email)
+            .putString("user_address", profile.address)
+            .apply()
+
+        _isLoggedIn.value = true
+        _loggedInUser.value = profile
+        autofillCheckoutFromProfile()
+        loadUserOrders()
+    }
+
+    fun autofillCheckoutFromProfile() {
+        val user = _loggedInUser.value
+        if (user != null) {
+            customerName.value = user.name
+            phoneNumber.value = user.phone
+            address.value = user.address
+        }
+    }
+
+    fun loadUserOrders() {
+        val user = _loggedInUser.value
+        if (user != null) {
+            viewModelScope.launch {
+                _isUserOrdersLoading.value = true
+                val list = repository.fetchOrdersForUser("", user.email, user.phone, _guestOrderIds.value)
+                _userOrders.value = list
+                _isUserOrdersLoading.value = false
+            }
+        }
     }
 }

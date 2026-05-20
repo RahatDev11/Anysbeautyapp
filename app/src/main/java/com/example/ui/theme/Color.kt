@@ -2,17 +2,17 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val LipstickPrimary = Color(0xFFEC587A)
-val LipstickDark = Color(0xFFC3415F)
-val LipstickLight = Color(0xFFFFF0F2)
-val LipstickAccent = Color(0xFFFF9EB5)
+val LipstickPrimary = Color(0xFFFF718F)
+val LipstickDark = Color(0xFFD44B68)
+val LipstickLight = Color(0xFFFFF2F4)
+val LipstickAccent = Color(0xFFFFD1D9)
 
-val BeautyBackground = Color(0xFFFFF7F8)
+val BeautyBackground = Color(0xFFFFF5F6)
 val BeautySurface = Color(0xFFFFFFFF)
-val BeautyOnSurface = Color(0xFF43131E)
+val BeautyOnSurface = Color(0xFF421E23)
 
-val BeautyGrayBorder = Color(0xFFF8E2E5)
-val BeautyGrayText = Color(0xFF8E6F74)
+val BeautyGrayBorder = Color(0xFFFEE6E9)
+val BeautyGrayText = Color(0xFF9E777E)
 
 val SuccessGreen = Color(0xFF2E7D32)
 val StatusOrange = Color(0xFFEF6C00)

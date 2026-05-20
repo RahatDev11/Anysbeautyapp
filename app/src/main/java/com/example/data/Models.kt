@@ -70,6 +70,15 @@ data class Order(
     val transactionId: String = "N/A"
 )
 
+@JsonClass(generateAdapter = true)
+data class UserProfile(
+    val phone: String = "",
+    val name: String = "",
+    val email: String = "",
+    val address: String = "",
+    val passwordHash: String = ""
+)
+
 data class ChatMessage(
     val role: String, // "user" or "model" / "assistant"
     val text: String,

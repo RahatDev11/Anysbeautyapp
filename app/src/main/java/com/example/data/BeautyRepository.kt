@@ -66,6 +66,12 @@ interface BeautyApiService {
 
     @PUT("counters/{date}.json")
     suspend fun setDateCounter(@Path("date") dateString: String, @Body counter: Int): Int
+
+    @GET("users/{phone}.json")
+    suspend fun getUserProfile(@Path("phone") phone: String): UserProfile?
+
+    @PUT("users/{phone}.json")
+    suspend fun createOrUpdateUser(@Path("phone") phone: String, @Body profile: UserProfile): UserProfile
 }
 
 interface GeminiApiService {
@@ -142,18 +148,39 @@ class BeautyRepository {
         }
     }
 
-    // Fetch orders matching specific custom user email or user ID
-    suspend fun fetchOrdersForUser(userId: String, email: String, localOrders: List<String>): List<Order> {
+    // Fetch orders matching specific custom user email, user ID, or phone number
+    suspend fun fetchOrdersForUser(userId: String, email: String, phone: String, localOrders: List<String>): List<Order> {
         return try {
             val allOrders = api.getAllOrders() ?: return emptyList()
             allOrders.values.filter { order ->
-                order.userId == userId || 
-                order.customerEmail.lowercase() == email.lowercase() || 
+                (userId.isNotBlank() && order.userId == userId) || 
+                (email.isNotBlank() && order.customerEmail.lowercase() == email.lowercase()) || 
+                (phone.isNotBlank() && order.phoneNumber.replace(" ", "") == phone.replace(" ", "")) ||
                 localOrders.contains(order.orderId)
             }.sortedByDescending { it.orderDate }
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
+        }
+    }
+
+    // Remote authentication profile database helpers
+    suspend fun getUserProfile(phone: String): UserProfile? {
+        return try {
+            api.getUserProfile(phone)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    suspend fun saveUserProfile(phone: String, profile: UserProfile): Boolean {
+        return try {
+            api.createOrUpdateUser(phone, profile)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
     }
 
