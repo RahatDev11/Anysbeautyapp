@@ -341,19 +341,59 @@ class BeautyViewModel(application: Application) : AndroidViewModel(application) 
             val userPhone = user?.phone ?: ""
             val list = repository.fetchOrdersForUser("", userEmail, userPhone, _guestOrderIds.value)
             _trackedOrders.value = list
+            
+            // Save fetched order IDs locally so they appear in local tracking history
+            if (list.isNotEmpty()) {
+                val updatedList = _guestOrderIds.value.toMutableList()
+                var modified = false
+                list.forEach { order ->
+                    if (!updatedList.contains(order.orderId)) {
+                        updatedList.add(order.orderId)
+                        modified = true
+                    }
+                }
+                if (modified) {
+                    _guestOrderIds.value = updatedList
+                    sharedPrefs.edit().putString("guest_orders", updatedList.joinToString(",")).apply()
+                }
+            }
+            
             _isTrackingLoading.value = false
         }
     }
 
-    fun searchAndSelectOrder(orderId: String, onFound: () -> Unit, onNotFound: () -> Unit) {
+    fun searchAndSelectOrder(query: String, onFound: () -> Unit, onNotFound: () -> Unit) {
         viewModelScope.launch {
             _isTrackingLoading.value = true
-            val fetched = repository.trackOrder(orderId)
-            _isTrackingLoading.value = false
+            val trimmedQuery = query.trim().replace(" ", "")
+            
+            // 1. Try to find the order by exact ID
+            val fetched = repository.trackOrder(trimmedQuery)
             if (fetched != null) {
+                saveLocalOrderTracker(fetched.orderId)
+                syncTrackingOrders()
                 _selectedTrackingOrder.value = fetched
+                _isTrackingLoading.value = false
+                onFound()
+                return@launch
+            }
+            
+            // 2. Try to find orders by Phone Number
+            val ordersByPhone = repository.fetchOrdersForUser("", "", trimmedQuery, emptyList())
+            if (ordersByPhone.isNotEmpty()) {
+                ordersByPhone.forEach { order ->
+                    saveLocalOrderTracker(order.orderId)
+                }
+                syncTrackingOrders()
+                
+                // If there's exactly one order, automatically pop open details modal
+                if (ordersByPhone.size == 1) {
+                    _selectedTrackingOrder.value = ordersByPhone.first()
+                }
+                _isTrackingLoading.value = false
                 onFound()
             } else {
+                _isTrackingLoading.value = false
                 onNotFound()
             }
         }

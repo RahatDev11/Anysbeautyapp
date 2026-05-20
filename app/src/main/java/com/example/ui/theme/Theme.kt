@@ -33,11 +33,11 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun MyApplicationTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false, // Force light brand theme to match website design exactly
     dynamicColor: Boolean = false, // Force brand colors for consistent business aesthetic
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = LightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

@@ -1847,8 +1847,8 @@ fun OrderTrackScreen(viewModel: BeautyViewModel) {
             OutlinedTextField(
                 value = searchInput,
                 onValueChange = { viewModel.trackSearchQuery.value = it },
-                placeholder = { Text("যেমন: 262005001", fontSize = 12.sp) },
-                label = { Text("অর্ডার আইডি সেন্ড করুন", fontSize = 11.sp) },
+                placeholder = { Text("আইডি বা মোবাইল নম্বর (যেমন: 01xxxxxxxxx)", fontSize = 12.sp) },
+                label = { Text("অর্ডার আইডি বা মোবাইল নম্বর", fontSize = 11.sp) },
                 singleLine = true,
                 trailingIcon = {
                     if (searchInput.isNotEmpty()) {
@@ -1871,15 +1871,15 @@ fun OrderTrackScreen(viewModel: BeautyViewModel) {
             Button(
                 onClick = {
                     if (searchInput.isBlank()) {
-                        Toast.makeText(context, "দয়া করে একটি সঠিক আইডি দিন।", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "দয়া করে একটি সঠিক আইডি বা মোবাইল নম্বর দিন।", Toast.LENGTH_SHORT).show()
                     } else {
                         viewModel.searchAndSelectOrder(
-                            orderId = searchInput.trim(),
+                            query = searchInput.trim(),
                             onFound = {
                                 Toast.makeText(context, "অর্ডার ট্র্যাকিং বিবরণ সফল!", Toast.LENGTH_SHORT).show()
                             },
                             onNotFound = {
-                                Toast.makeText(context, "এই আইডি সম্বলিত কোনো অর্ডার পাওয়া যায়নি!", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, "এই আইডি বা নম্বর সম্বলিত কোনো অর্ডার পাওয়া যায়নি!", Toast.LENGTH_LONG).show()
                             }
                         )
                     }
@@ -1926,7 +1926,7 @@ fun OrderTrackScreen(viewModel: BeautyViewModel) {
                                 color = BeautyOnSurface.copy(alpha = 0.5f)
                             )
                             Text(
-                                text = "এই ফোনে পূর্বে করা অর্ডারের বিবরণ দেখতে উপরে আপনার ট্র্যাক আইডি খুঁজুন।",
+                                text = "পূর্বে করা অর্ডারের বিবরণ দেখতে উপরে আপনার ট্র্যাক আইডি অথবা অর্ডারকৃত মোবাইল নম্বর দিয়ে খুঁজুন।",
                                 fontSize = 11.sp,
                                 color = BeautyOnSurface.copy(alpha = 0.4f),
                                 modifier = Modifier.padding(horizontal = 40.dp),
