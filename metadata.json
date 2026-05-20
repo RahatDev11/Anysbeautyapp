@@ -1,0 +1,6 @@
+{
+  "name": "Any's Beauty Corner",
+  "description": "আপনার সৌন্দর্য চর্চার বিশ্বস্ত সঙ্গী।",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
