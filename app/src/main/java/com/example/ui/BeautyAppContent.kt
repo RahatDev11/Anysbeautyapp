@@ -779,6 +779,13 @@ fun ProductDetailScreen(viewModel: BeautyViewModel) {
     var mainImageIdx by remember { mutableStateOf(0) }
     val imagesList = activeProduct.getImageList()
 
+    val allProducts by viewModel.products.collectAsState()
+    val recommendedProducts = remember(allProducts, activeProduct) {
+        val sameCategory = allProducts.filter { it.id != activeProduct.id && it.category == activeProduct.category }
+        val others = allProducts.filter { it.id != activeProduct.id && it.category != activeProduct.category }
+        (sameCategory + others).take(6)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
